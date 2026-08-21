@@ -63,7 +63,7 @@ namespace BinInfo {
     void PrintUsageScreen() {
         cout << "Usage: bininfo <filename>" << endl;
         cout << "Version: 1.0" << endl;
-        cout << "Outputs information from binary ELF32/ELF64 file as JSON" << endl;
+        cout << "Outputs information from binary ELF64 files as JSON" << endl;
         cout << endl;
         cout << "Created by Kjetil Kristoffer Solberg <post@ikjetil.no>" << endl;
         cout << "Written in C++" << endl;        

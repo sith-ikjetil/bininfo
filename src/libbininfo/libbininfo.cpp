@@ -408,9 +408,6 @@ static json analyze_elf64(const std::string& filename)
 
     /*
      * For now this parser assumes little-endian ELF64.
-     *
-     * We still report the byte order below, but don't try to byte-swap
-     * a big-endian ELF.
      */
     if (ehdr.e_ident[EI_DATA] != ELFDATA2LSB) {
         return {
@@ -514,12 +511,22 @@ static json analyze_elf64(const std::string& filename)
     };
 
     /*
-     * Some ELF files can legally have no section table.
+     * Arrays that may be empty.
      */
     result["sections"] = json::array();
+    result["imports"] = json::array();
+    result["exports"] = json::array();
+    result["dependencies"] = json::array();
 
-    if (ehdr.e_shnum == 0)
+    /*
+     * Some ELF files can legally have no section table.
+     */
+    if (ehdr.e_shnum == 0) {
+        result["importCount"] = 0;
+        result["exportCount"] = 0;
+        result["dependencyCount"] = 0;
         return result;
+    }
 
     /*
      * Read all section headers.
@@ -561,114 +568,119 @@ static json analyze_elf64(const std::string& filename)
     }
 
     /*
-     * Validate the section-name string table.
+     * Section-name string table.
      */
-    if (ehdr.e_shstrndx == SHN_UNDEF) {
-        /*
-         * Sections exist, but no section-name string table.
-         * We can still report the section data.
-         */
-        for (size_t i = 0; i < sections.size(); ++i) {
-            const Elf64_Shdr& sh = sections[i];
+    std::vector<char> section_names;
+    uint64_t section_name_table_size = 0;
 
-            result["sections"].push_back({
-                {"index", i},
-                {"name", ""},
-                {"type", section_type_name(sh.sh_type)},
-                {"typeValue", sh.sh_type},
-                {"flags", section_flags(sh.sh_flags)},
-                {"flagsValue", sh.sh_flags},
-                {"address", hex_value(sh.sh_addr)},
-                {"offset", sh.sh_offset},
-                {"size", sh.sh_size},
-                {"alignment", sh.sh_addralign},
-                {"entrySize", sh.sh_entsize},
-                {"link", sh.sh_link},
-                {"info", sh.sh_info},
-                {"storedInFile", sh.sh_type != SHT_NOBITS}
-            });
+    if (ehdr.e_shstrndx != SHN_UNDEF) {
+
+        if (ehdr.e_shstrndx >= sections.size()) {
+            return {
+                {"success", false},
+                {"error", {
+                    {"code", "INVALID_STRING_TABLE"},
+                    {"message", "Invalid section-name string table index"}
+                }}
+            };
         }
 
-        return result;
-    }
+        const Elf64_Shdr& shstr =
+            sections[ehdr.e_shstrndx];
 
-    if (ehdr.e_shstrndx >= sections.size()) {
-        return {
-            {"success", false},
-            {"error", {
-                {"code", "INVALID_STRING_TABLE"},
-                {"message", "Invalid section-name string table index"}
-            }}
-        };
-    }
+        if (shstr.sh_type != SHT_STRTAB) {
+            return {
+                {"success", false},
+                {"error", {
+                    {"code", "INVALID_STRING_TABLE"},
+                    {"message", "Section-name table is not a string table"}
+                }}
+            };
+        }
 
-    const Elf64_Shdr& shstr =
-        sections[ehdr.e_shstrndx];
+        if (shstr.sh_offset > file_size ||
+            shstr.sh_size > file_size - shstr.sh_offset)
+        {
+            return {
+                {"success", false},
+                {"error", {
+                    {"code", "INVALID_STRING_TABLE"},
+                    {"message", "Section-name string table is outside the file"}
+                }}
+            };
+        }
 
-    if (shstr.sh_type != SHT_STRTAB) {
-        return {
-            {"success", false},
-            {"error", {
-                {"code", "INVALID_STRING_TABLE"},
-                {"message", "Section-name table is not a string table"}
-            }}
-        };
-    }
+        section_name_table_size = shstr.sh_size;
 
-    if (shstr.sh_offset > file_size ||
-        shstr.sh_size > file_size - shstr.sh_offset)
-    {
-        return {
-            {"success", false},
-            {"error", {
-                {"code", "INVALID_STRING_TABLE"},
-                {"message", "Section-name string table is outside the file"}
-            }}
-        };
+        section_names.assign(
+            static_cast<size_t>(shstr.sh_size) + 1,
+            '\0'
+        );
+
+        file.clear();
+
+        file.seekg(
+            static_cast<std::streamoff>(shstr.sh_offset),
+            std::ios::beg
+        );
+
+        if (!file) {
+            return {
+                {"success", false},
+                {"error", {
+                    {"code", "SEEK_FAILED"},
+                    {"message", "Unable to seek to section-name string table"}
+                }}
+            };
+        }
+
+        file.read(
+            section_names.data(),
+            static_cast<std::streamsize>(shstr.sh_size)
+        );
+
+        if (!file) {
+            return {
+                {"success", false},
+                {"error", {
+                    {"code", "READ_FAILED"},
+                    {"message", "Unable to read section-name string table"}
+                }}
+            };
+        }
     }
 
     /*
-     * Read .shstrtab.
-     *
-     * One extra NUL byte protects against a malformed table that lacks
-     * a final terminator.
+     * Retrieve a section name safely.
      */
-    std::vector<char> section_names(
-        static_cast<size_t>(shstr.sh_size) + 1,
-        '\0'
-    );
+    auto get_section_name =
+        [&](const Elf64_Shdr& sh) -> std::string
+    {
+        if (section_names.empty())
+            return "";
 
-    file.clear();
+        if (sh.sh_name >= section_name_table_size)
+            return "<invalid>";
 
-    file.seekg(
-        static_cast<std::streamoff>(shstr.sh_offset),
-        std::ios::beg
-    );
+        const char* start =
+            section_names.data() + sh.sh_name;
 
-    if (!file) {
-        return {
-            {"success", false},
-            {"error", {
-                {"code", "SEEK_FAILED"},
-                {"message", "Unable to seek to section-name string table"}
-            }}
-        };
-    }
+        const size_t remaining =
+            static_cast<size_t>(
+                section_name_table_size - sh.sh_name
+            );
 
-    file.read(
-        section_names.data(),
-        static_cast<std::streamsize>(shstr.sh_size)
-    );
+        const void* end =
+            std::memchr(start, '\0', remaining);
 
-    if (!file) {
-        return {
-            {"success", false},
-            {"error", {
-                {"code", "READ_FAILED"},
-                {"message", "Unable to read section-name string table"}
-            }}
-        };
-    }
+        if (!end)
+            return "<invalid>";
+
+        return std::string(
+            start,
+            static_cast<const char*>(end) - start
+        );
+    };
 
     /*
      * Parse each section.
@@ -677,44 +689,9 @@ static json analyze_elf64(const std::string& filename)
 
         const Elf64_Shdr& sh = sections[i];
 
-        std::string name;
+        const std::string name =
+            get_section_name(sh);
 
-        if (sh.sh_name < shstr.sh_size) {
-
-            const char *start =
-                section_names.data() + sh.sh_name;
-
-            const size_t remaining =
-                static_cast<size_t>(shstr.sh_size - sh.sh_name);
-
-            /*
-             * Make sure the section name has a terminating NUL inside
-             * the actual string table.
-             */
-            const void *end =
-                std::memchr(start, '\0', remaining);
-
-            if (end) {
-                name.assign(
-                    start,
-                    static_cast<const char*>(end) - start
-                );
-            }
-            else {
-                name = "<invalid>";
-            }
-        }
-        else {
-            name = "<invalid>";
-        }
-
-        /*
-         * For normal sections, validate that their file contents are
-         * actually inside the ELF file.
-         *
-         * SHT_NOBITS sections such as .bss occupy memory but have no
-         * corresponding bytes stored in the file.
-         */
         bool section_bounds_valid = true;
 
         if (sh.sh_type != SHT_NOBITS && sh.sh_size != 0) {
@@ -751,6 +728,515 @@ static json analyze_elf64(const std::string& filename)
 
         result["sections"].push_back(section);
     }
+
+    /*
+     * ------------------------------------------------------------
+     * Parse shared-library dependencies.
+     * ------------------------------------------------------------
+     *
+     * SHT_DYNAMIC contains Elf64_Dyn entries.
+     *
+     * DT_NEEDED entries contain offsets into the dynamic string
+     * table. sh_link identifies that string table, normally .dynstr.
+     */
+    for (size_t section_index = 0;
+         section_index < sections.size();
+         ++section_index)
+    {
+        const Elf64_Shdr& dynamic_section =
+            sections[section_index];
+
+        if (dynamic_section.sh_type != SHT_DYNAMIC)
+            continue;
+
+        /*
+         * sh_link identifies the associated dynamic string table.
+         */
+        if (dynamic_section.sh_link >= sections.size())
+            continue;
+
+        const Elf64_Shdr& dynamic_strtab =
+            sections[dynamic_section.sh_link];
+
+        if (dynamic_strtab.sh_type != SHT_STRTAB)
+            continue;
+
+        /*
+         * Validate .dynamic bounds.
+         */
+        if (dynamic_section.sh_offset > file_size ||
+            dynamic_section.sh_size >
+                file_size - dynamic_section.sh_offset)
+        {
+            continue;
+        }
+
+        /*
+         * Validate .dynstr bounds.
+         */
+        if (dynamic_strtab.sh_offset > file_size ||
+            dynamic_strtab.sh_size >
+                file_size - dynamic_strtab.sh_offset)
+        {
+            continue;
+        }
+
+        uint64_t dynamic_entry_size =
+            dynamic_section.sh_entsize;
+
+        if (dynamic_entry_size == 0)
+            dynamic_entry_size = sizeof(Elf64_Dyn);
+
+        if (dynamic_entry_size < sizeof(Elf64_Dyn))
+            continue;
+
+        const uint64_t dynamic_entry_count =
+            dynamic_section.sh_size /
+            dynamic_entry_size;
+
+        /*
+         * Read the dynamic string table.
+         */
+        std::vector<char> dynamic_strings(
+            static_cast<size_t>(dynamic_strtab.sh_size) + 1,
+            '\0'
+        );
+
+        file.clear();
+
+        file.seekg(
+            static_cast<std::streamoff>(
+                dynamic_strtab.sh_offset
+            ),
+            std::ios::beg
+        );
+
+        if (!file)
+            continue;
+
+        file.read(
+            dynamic_strings.data(),
+            static_cast<std::streamsize>(
+                dynamic_strtab.sh_size
+            )
+        );
+
+        if (!file)
+            continue;
+
+        /*
+         * Parse each Elf64_Dyn entry.
+         */
+        for (uint64_t dynamic_index = 0;
+             dynamic_index < dynamic_entry_count;
+             ++dynamic_index)
+        {
+            const uint64_t dynamic_offset =
+                dynamic_section.sh_offset +
+                dynamic_index * dynamic_entry_size;
+
+            if (dynamic_offset > file_size ||
+                sizeof(Elf64_Dyn) >
+                    file_size - dynamic_offset)
+            {
+                break;
+            }
+
+            Elf64_Dyn dyn {};
+
+            file.clear();
+
+            file.seekg(
+                static_cast<std::streamoff>(
+                    dynamic_offset
+                ),
+                std::ios::beg
+            );
+
+            if (!file)
+                break;
+
+            file.read(
+                reinterpret_cast<char*>(&dyn),
+                sizeof(dyn)
+            );
+
+            if (!file)
+                break;
+
+            /*
+             * DT_NULL terminates the dynamic array.
+             */
+            if (dyn.d_tag == DT_NULL)
+                break;
+
+            /*
+             * DT_NEEDED identifies a required shared library.
+             */
+            if (dyn.d_tag != DT_NEEDED)
+                continue;
+
+            const uint64_t name_offset =
+                dyn.d_un.d_val;
+
+            if (name_offset >= dynamic_strtab.sh_size)
+                continue;
+
+            const char* start =
+                dynamic_strings.data() + name_offset;
+
+            const size_t remaining =
+                static_cast<size_t>(
+                    dynamic_strtab.sh_size -
+                    name_offset
+                );
+
+            const void* end =
+                std::memchr(
+                    start,
+                    '\0',
+                    remaining
+                );
+
+            if (!end)
+                continue;
+
+            std::string dependency_name(
+                start,
+                static_cast<const char*>(end) - start
+            );
+
+            if (dependency_name.empty())
+                continue;
+
+            result["dependencies"].push_back(
+                dependency_name
+            );
+        }
+    }
+
+    /*
+     * ELF symbol helper functions.
+     */
+    auto symbol_binding_name =
+        [](unsigned char info) -> const char*
+    {
+        switch (ELF64_ST_BIND(info)) {
+
+            case STB_LOCAL:
+                return "LOCAL";
+
+            case STB_GLOBAL:
+                return "GLOBAL";
+
+            case STB_WEAK:
+                return "WEAK";
+
+#ifdef STB_GNU_UNIQUE
+            case STB_GNU_UNIQUE:
+                return "GNU_UNIQUE";
+#endif
+
+            default:
+                return "UNKNOWN";
+        }
+    };
+
+    auto symbol_type_name =
+        [](unsigned char info) -> const char*
+    {
+        switch (ELF64_ST_TYPE(info)) {
+
+            case STT_NOTYPE:
+                return "NOTYPE";
+
+            case STT_OBJECT:
+                return "OBJECT";
+
+            case STT_FUNC:
+                return "FUNC";
+
+            case STT_SECTION:
+                return "SECTION";
+
+            case STT_FILE:
+                return "FILE";
+
+            case STT_COMMON:
+                return "COMMON";
+
+            case STT_TLS:
+                return "TLS";
+
+#ifdef STT_GNU_IFUNC
+            case STT_GNU_IFUNC:
+                return "GNU_IFUNC";
+#endif
+
+            default:
+                return "UNKNOWN";
+        }
+    };
+
+    auto symbol_visibility_name =
+        [](unsigned char other) -> const char*
+    {
+        switch (ELF64_ST_VISIBILITY(other)) {
+
+            case STV_DEFAULT:
+                return "DEFAULT";
+
+            case STV_INTERNAL:
+                return "INTERNAL";
+
+            case STV_HIDDEN:
+                return "HIDDEN";
+
+            case STV_PROTECTED:
+                return "PROTECTED";
+
+            default:
+                return "UNKNOWN";
+        }
+    };
+
+    /*
+     * Parse dynamic symbol tables.
+     */
+    for (size_t section_index = 0;
+         section_index < sections.size();
+         ++section_index)
+    {
+        const Elf64_Shdr& symtab =
+            sections[section_index];
+
+        if (symtab.sh_type != SHT_DYNSYM)
+            continue;
+
+        if (symtab.sh_link >= sections.size())
+            continue;
+
+        const Elf64_Shdr& strtab =
+            sections[symtab.sh_link];
+
+        if (strtab.sh_type != SHT_STRTAB)
+            continue;
+
+        if (symtab.sh_offset > file_size ||
+            symtab.sh_size > file_size - symtab.sh_offset)
+        {
+            continue;
+        }
+
+        if (strtab.sh_offset > file_size ||
+            strtab.sh_size > file_size - strtab.sh_offset)
+        {
+            continue;
+        }
+
+        uint64_t symbol_entry_size =
+            symtab.sh_entsize;
+
+        if (symbol_entry_size == 0)
+            symbol_entry_size = sizeof(Elf64_Sym);
+
+        if (symbol_entry_size < sizeof(Elf64_Sym))
+            continue;
+
+        const uint64_t symbol_count =
+            symtab.sh_size / symbol_entry_size;
+
+        std::vector<char> symbol_names(
+            static_cast<size_t>(strtab.sh_size) + 1,
+            '\0'
+        );
+
+        file.clear();
+
+        file.seekg(
+            static_cast<std::streamoff>(strtab.sh_offset),
+            std::ios::beg
+        );
+
+        if (!file)
+            continue;
+
+        file.read(
+            symbol_names.data(),
+            static_cast<std::streamsize>(strtab.sh_size)
+        );
+
+        if (!file)
+            continue;
+
+        for (uint64_t symbol_index = 0;
+             symbol_index < symbol_count;
+             ++symbol_index)
+        {
+            const uint64_t symbol_offset =
+                symtab.sh_offset +
+                symbol_index * symbol_entry_size;
+
+            if (symbol_offset > file_size ||
+                sizeof(Elf64_Sym) >
+                    file_size - symbol_offset)
+            {
+                break;
+            }
+
+            Elf64_Sym symbol {};
+
+            file.clear();
+
+            file.seekg(
+                static_cast<std::streamoff>(
+                    symbol_offset
+                ),
+                std::ios::beg
+            );
+
+            if (!file)
+                break;
+
+            file.read(
+                reinterpret_cast<char*>(&symbol),
+                sizeof(symbol)
+            );
+
+            if (!file)
+                break;
+
+            if (symbol.st_name == 0)
+                continue;
+
+            if (symbol.st_name >= strtab.sh_size)
+                continue;
+
+            const char* start =
+                symbol_names.data() + symbol.st_name;
+
+            const size_t remaining =
+                static_cast<size_t>(
+                    strtab.sh_size -
+                    symbol.st_name
+                );
+
+            const void* end =
+                std::memchr(
+                    start,
+                    '\0',
+                    remaining
+                );
+
+            if (!end)
+                continue;
+
+            std::string symbol_name(
+                start,
+                static_cast<const char*>(end) - start
+            );
+
+            if (symbol_name.empty())
+                continue;
+
+            const unsigned binding =
+                ELF64_ST_BIND(symbol.st_info);
+
+            const unsigned type =
+                ELF64_ST_TYPE(symbol.st_info);
+
+            const unsigned visibility =
+                ELF64_ST_VISIBILITY(symbol.st_other);
+
+            /*
+             * Only callable functions.
+             */
+            bool is_function =
+                type == STT_FUNC;
+
+#ifdef STT_GNU_IFUNC
+            if (type == STT_GNU_IFUNC)
+                is_function = true;
+#endif
+
+            if (!is_function)
+                continue;
+
+            json symbol_json = {
+                {"name", symbol_name},
+
+                {"binding",
+                    symbol_binding_name(symbol.st_info)},
+
+                {"type",
+                    symbol_type_name(symbol.st_info)},
+
+                {"visibility",
+                    symbol_visibility_name(symbol.st_other)},
+
+                {"value",
+                    hex_value(symbol.st_value)},
+
+                {"size",
+                    symbol.st_size},
+
+                {"sectionIndex",
+                    symbol.st_shndx},
+
+                {"symbolIndex",
+                    symbol_index},
+
+                {"symbolTable",
+                    get_section_name(symtab)}
+            };
+
+            /*
+             * IMPORT
+             */
+            if (symbol.st_shndx == SHN_UNDEF) {
+
+                if (binding == STB_GLOBAL ||
+                    binding == STB_WEAK)
+                {
+                    result["imports"].push_back(
+                        std::move(symbol_json)
+                    );
+                }
+
+                continue;
+            }
+
+            /*
+             * EXPORT
+             *
+             * Only strong GLOBAL functions.
+             */
+            if (binding != STB_GLOBAL)
+                continue;
+
+            if (visibility != STV_DEFAULT &&
+                visibility != STV_PROTECTED)
+            {
+                continue;
+            }
+
+            result["exports"].push_back(
+                std::move(symbol_json)
+            );
+        }
+    }
+
+    /*
+     * Final counts.
+     */
+    result["importCount"] =
+        result["imports"].size();
+
+    result["exportCount"] =
+        result["exports"].size();
+
+    result["dependencyCount"] =
+        result["dependencies"].size();
 
     return result;
 }
