@@ -15,16 +15,16 @@ Outputs information from binary ELF64 files to stdout as JSON
 **bininfo** /usr/bin/ls  
 Outputs default info  
 
-**bininfo** /usr/bin/ls --include-exports  
+**bininfo** /usr/bin/ls -\-include-exports  
 Outputs info including exports  
 
-**bininfo** /usr/bin/ls --include-imports  
+**bininfo** /usr/bin/ls -\-include-imports  
 Outputs info including imports  
 
-**bininfo** /usr/bin/ls --include-sections  
+**bininfo** /usr/bin/ls -\-include-sections  
 Outputs info including sections  
 
-**bininfo** /usr/bin/ls | ccat --syntax=json  
+**bininfo** /usr/bin/ls | ccat -\-syntax=json  
 Outputs info and colorize output  
 
 # BUGS
