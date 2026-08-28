@@ -513,9 +513,9 @@ static json analyze_elf64(const std::string& filename, bool incExports, bool inc
     /*
      * Arrays that may be empty.
      */
-    result["sections"] = json::array();
-    result["imports"] = json::array();
-    result["exports"] = json::array();
+    if (incSections) { result["sections"] = json::array(); }
+    if (incImports) { result["imports"] = json::array(); }
+    if (incExports) { result["exports"] = json::array(); }
     result["dependencies"] = json::array();
 
     /*

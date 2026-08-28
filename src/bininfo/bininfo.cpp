@@ -66,9 +66,9 @@ namespace BinInfo {
         cout << "Version: 1.1" << endl;
         cout << "Outputs information from binary ELF64 files as JSON to stdout" << endl;
         cout << endl;
-        cout << "  --include-exports     includes sections in output." << endl;
-        cout << "  --include-imports     includes sections in output." << endl;
-        cout << "  --include-sections    includes sections in output." << endl;
+        cout << "  --include-exports     include exports in output." << endl;
+        cout << "  --include-imports     include imports in output." << endl;
+        cout << "  --include-sections    include sections in output." << endl;
         cout << endl;
         cout << "Examples:" << endl;
         cout << "  bininfo /usr/bin/ls                       Outputs default info" << endl;
