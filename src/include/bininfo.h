@@ -11,7 +11,7 @@ extern "C" {
     //
     // (i): Gives analyze as json.
     //
-    const char *bininfo_analyze_json(const char *filename);    
+    const char *bininfo_analyze_json(const char *filename, bool incExports, bool incImports, bool incSections);    
 
     //
     // (i): Free's output (json/xml).

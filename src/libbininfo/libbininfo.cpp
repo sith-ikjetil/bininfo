@@ -31,7 +31,7 @@ static std::string machine_name(uint16_t machine);
 static std::string hex_value(uint64_t value);
 static std::string section_flags(uint64_t flags);
 static std::string section_type_name(uint32_t type);
-static json analyze_elf64(const std::string& filename);
+static json analyze_elf64(const std::string& filename, bool incExports, bool incImports, bool incSections);
 
 //
 // extern
@@ -48,7 +48,7 @@ extern "C" {
     //
     // (i): Gives analyze as json.
     //
-    const char *bininfo_analyze_json(const char *filename)
+    const char *bininfo_analyze_json(const char *filename, bool incExports, bool incImports, bool incSections)
     {        
         if (!filename) {
             json result = {
@@ -120,7 +120,7 @@ extern "C" {
                     };
                 }
                 else if (ident[EI_CLASS] == ELFCLASS64) {
-                    result = analyze_elf64(filename);
+                    result = analyze_elf64(filename, incExports, incImports, incSections);
                 }
                 else if (ident[EI_CLASS] == ELFCLASS32) {
                     result = {
@@ -323,7 +323,7 @@ static std::string section_flags(uint64_t flags)
 //
 // (i): Analyze ELF64
 //
-static json analyze_elf64(const std::string& filename)
+static json analyze_elf64(const std::string& filename, bool incExports, bool incImports, bool incSections)
 {
     std::ifstream file(filename, std::ios::binary);
 
@@ -726,7 +726,9 @@ static json analyze_elf64(const std::string& filename)
             {"boundsValid", section_bounds_valid}
         };
 
-        result["sections"].push_back(section);
+        if (incSections) {
+            result["sections"].push_back(section);
+        }
     }
 
     /*
@@ -1198,9 +1200,11 @@ static json analyze_elf64(const std::string& filename)
                 if (binding == STB_GLOBAL ||
                     binding == STB_WEAK)
                 {
-                    result["imports"].push_back(
-                        std::move(symbol_json)
-                    );
+                    if (incImports) {
+                        result["imports"].push_back(
+                            std::move(symbol_json)
+                        );
+                    }
                 }
 
                 continue;
@@ -1220,20 +1224,26 @@ static json analyze_elf64(const std::string& filename)
                 continue;
             }
 
-            result["exports"].push_back(
-                std::move(symbol_json)
-            );
+            if (incExports) {
+                result["exports"].push_back(
+                    std::move(symbol_json)
+                );
+            }
         }
     }
 
     /*
      * Final counts.
      */
-    result["importCount"] =
-        result["imports"].size();
+    if (incImports) {
+        result["importCount"] =
+            result["imports"].size();
+    }
 
-    result["exportCount"] =
-        result["exports"].size();
+    if (incExports) {
+        result["exportCount"] =
+            result["exports"].size();
+    }
 
     result["dependencyCount"] =
         result["dependencies"].size();

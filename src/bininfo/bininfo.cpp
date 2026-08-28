@@ -29,6 +29,7 @@ namespace BinInfo {
     // Function prototypes.
     //
     void PrintUsageScreen();
+    bool IsArgSet(string token, int argc, char** argv);
 
     //
     // Function: BinInfo::main
@@ -36,12 +37,12 @@ namespace BinInfo {
     // (i): Main entry point.
     //
     int main(int argc, char** argv) {
-        if (argc != 2) {
+        if (argc < 2) {
             PrintUsageScreen();
             return 1;
         }
 
-        const char *result = bininfo_analyze_json(argv[1]);
+        const char *result = bininfo_analyze_json(argv[1], IsArgSet("--include-exports",argc, argv), IsArgSet("--include-imports",argc,argv), IsArgSet("--include-sections",argc,argv));
 
         if (!result) {
             cerr << "Unable to analyze file\n";
@@ -62,12 +63,37 @@ namespace BinInfo {
     //
     void PrintUsageScreen() {
         cout << "Usage: bininfo <filename>" << endl;
-        cout << "Version: 1.0" << endl;
-        cout << "Outputs information from binary ELF64 files as JSON" << endl;
+        cout << "Version: 1.1" << endl;
+        cout << "Outputs information from binary ELF64 files as JSON to stdout" << endl;
+        cout << endl;
+        cout << "  --include-exports     includes sections in output." << endl;
+        cout << "  --include-imports     includes sections in output." << endl;
+        cout << "  --include-sections    includes sections in output." << endl;
+        cout << endl;
+        cout << "Examples:" << endl;
+        cout << "  bininfo /usr/bin/ls                       Outputs default info" << endl;
+        cout << "  bininfo /usr/bin/ls --include-exports     Outputs info including exports" << endl;
+        cout << "  bininfo /usr/bin/ls --include-imports     Outputs info including imports" << endl;
+        cout << "  bininfo /usr/bin/ls --include-sections    Outputs info including sections" << endl;
+        cout << "  bininfo /usr/bin/ls | ccat --syntax=json  Outputs info and colorize output" << endl;
         cout << endl;
         cout << "Created by Kjetil Kristoffer Solberg <post@ikjetil.no>" << endl;
         cout << "Written in C++" << endl;        
         cout << endl;
+    }
+
+    //
+    // Function: IsArgSet
+    //
+    // (i): Returnes true if token is set. False otherwise.
+    //
+    bool IsArgSet(string token, int argc, char** argv) {
+        for (int i = 1; i < argc; i++) {
+            if (token == argv[i]) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
