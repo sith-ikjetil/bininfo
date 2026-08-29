@@ -1,9 +1,9 @@
 /*
 * File: bininfo.cpp
-* Author: Kjetil Kristoffer Solberg <post@ikjetil.no>
-* Description: A utility that outputs data about ELF32/ELF64 as JSON.
 * Date: 2026-08-21
-**/
+* Author: Kjetil Kristoffer Solberg <post@ikjetil.no>
+* Description: A utility that outputs data about ELF32/ELF64 as JSON. 
+*/
 //
 // #include
 //
@@ -11,13 +11,15 @@
 #include <stddef.h>
 #include <iostream>
 #include <string>
+#include <print>
 #include "../include/bininfo.h"
 
 //
-//
+// using
 //
 using std::cerr;
 using std::cout;
+using std::println;
 using std::endl;
 using std::string;
 
@@ -62,24 +64,24 @@ namespace BinInfo {
     // (i): Outputs usage information.
     //
     void PrintUsageScreen() {
-        cout << "Usage: bininfo <filename>" << endl;
-        cout << "Version: 1.1" << endl;
-        cout << "Outputs information from binary ELF64 files as JSON to stdout" << endl;
-        cout << endl;
-        cout << "  --include-exports     include exports in output." << endl;
-        cout << "  --include-imports     include imports in output." << endl;
-        cout << "  --include-sections    include sections in output." << endl;
-        cout << endl;
-        cout << "Examples:" << endl;
-        cout << "  bininfo /usr/bin/ls                       Outputs default info" << endl;
-        cout << "  bininfo /usr/bin/ls --include-exports     Outputs info including exports" << endl;
-        cout << "  bininfo /usr/bin/ls --include-imports     Outputs info including imports" << endl;
-        cout << "  bininfo /usr/bin/ls --include-sections    Outputs info including sections" << endl;
-        cout << "  bininfo /usr/bin/ls | ccat --syntax=json  Outputs info and colorize output" << endl;
-        cout << endl;
-        cout << "Created by Kjetil Kristoffer Solberg <post@ikjetil.no>" << endl;
-        cout << "Written in C++" << endl;        
-        cout << endl;
+        println("Usage: bininfo <filename>");
+        println("Version: 1.1");
+        println("Outputs information from binary ELF64 files as JSON to stdout");
+        println();
+        println("  --include-exports     include exports in output.");
+        println("  --include-imports     include imports in output.");
+        println("  --include-sections    include sections in output.");
+        println();
+        println("Examples:");
+        println("  bininfo /usr/bin/ls                       Outputs default info");
+        println("  bininfo /usr/bin/ls --include-exports     Outputs info including exports");
+        println("  bininfo /usr/bin/ls --include-imports     Outputs info including imports");
+        println("  bininfo /usr/bin/ls --include-sections    Outputs info including sections");
+        println("  bininfo /usr/bin/ls | ccat --syntax=json  Outputs info and colorize output");
+        println();
+        println("Created by Kjetil Kristoffer Solberg <post@ikjetil.no>");
+        println("Written in C++");
+        println();
     }
 
     //
