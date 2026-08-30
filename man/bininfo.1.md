@@ -1,4 +1,4 @@
-% bininfo(1) bininfo 1.1
+% bininfo(1) bininfo 1.2
 % Written by Kjetil Kristoffer Solberg
 % August 2026
 
@@ -6,22 +6,27 @@
 bininfo - outputs information from binary ELF64 files as JSON
 
 # SYNOPSIS
-**bininfo** [*FILE*]  
+**bininfo** [*OPTIONS*] [*FILE*]  
 
 # DESCRIPTION
 Outputs information from binary ELF64 files to stdout as JSON
+
+# OPTIONS
+**-\-include-exports**     include exports in output  
+**-\-include-imports**     include imports in output  
+**-\-include-sections**    include sections in output  
 
 # EXAMPLES
 **bininfo** /usr/bin/ls  
 Outputs default info  
 
-**bininfo** /usr/bin/ls -\-include-exports  
+**bininfo** -\-include-exports /usr/bin/ls  
 Outputs info including exports  
 
-**bininfo** /usr/bin/ls -\-include-imports  
+**bininfo** -\-include-imports /usr/bin/ls  
 Outputs info including imports  
 
-**bininfo** /usr/bin/ls -\-include-sections  
+**bininfo** -\-include-sections /usr/bin/ls  
 Outputs info including sections  
 
 **bininfo** /usr/bin/ls | ccat -\-syntax=json  

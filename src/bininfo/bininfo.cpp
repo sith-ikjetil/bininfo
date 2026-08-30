@@ -12,6 +12,7 @@
 #include <iostream>
 #include <string>
 #include <print>
+#include <filesystem>
 #include "../include/bininfo.h"
 
 //
@@ -32,6 +33,7 @@ namespace BinInfo {
     //
     void PrintUsageScreen();
     bool IsArgSet(string token, int argc, char** argv);
+    string GetArgFilename(int argc, char** argv);
 
     //
     // Function: BinInfo::main
@@ -39,12 +41,14 @@ namespace BinInfo {
     // (i): Main entry point.
     //
     int main(int argc, char** argv) {
-        if (argc < 2) {
+        string filename = GetArgFilename(argc, argv);
+
+        if (filename.empty()) {
             PrintUsageScreen();
             return 1;
         }
 
-        const char *result = bininfo_analyze_json(argv[1], IsArgSet("--include-exports",argc, argv), IsArgSet("--include-imports",argc,argv), IsArgSet("--include-sections",argc,argv));
+        const char *result = bininfo_analyze_json(filename.c_str(), IsArgSet("--include-exports",argc, argv), IsArgSet("--include-imports",argc,argv), IsArgSet("--include-sections",argc,argv));
 
         if (!result) {
             cerr << "Unable to analyze file\n";
@@ -64,10 +68,11 @@ namespace BinInfo {
     // (i): Outputs usage information.
     //
     void PrintUsageScreen() {
-        println("Usage: bininfo <filename>");
-        println("Version: 1.1");
+        println("Usage: bininfo [options] <filename>");
+        println("Version: 1.2");
         println("Outputs information from binary ELF64 files as JSON to stdout");
         println();
+        println("Options:");
         println("  --include-exports     include exports in output.");
         println("  --include-imports     include imports in output.");
         println("  --include-sections    include sections in output.");
@@ -96,6 +101,20 @@ namespace BinInfo {
             }
         }
         return false;
+    }
+
+    //
+    // Function: GetArgFilename
+    //
+    // (i): Returnes the first valid filename argument or empty string.
+    //
+    string GetArgFilename(int argc, char** argv) {
+        for (int i = 1; i < argc; i++) {
+            if (std::filesystem::exists(argv[i])) {
+                return argv[i];
+            }
+        }
+        return "";
     }
 }
 
