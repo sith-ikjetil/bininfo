@@ -116,7 +116,7 @@ namespace BinInfo {
         }
         return "";
     }
-}
+}// namespace BinInfo
 
 //
 // Function: main
