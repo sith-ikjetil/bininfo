@@ -51,11 +51,11 @@ namespace BinInfo {
         const char *result = bininfo_analyze_json(filename.c_str(), IsArgSet("--include-exports",argc, argv), IsArgSet("--include-imports",argc,argv), IsArgSet("--include-sections",argc,argv));
 
         if (!result) {
-            cerr << "Unable to analyze file\n";
+            println(stderr, "Unable to analyze file");
             return 1;
         }
 
-        cout << result << '\n';
+        println("{}", result);
 
         bininfo_free(reinterpret_cast<void*>(const_cast<char*>(result)));
 

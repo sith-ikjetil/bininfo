@@ -6,7 +6,7 @@
 #: Description : Builds bininfo shell utility.
 echo "Building bininfo..."
 echo "> using debug build <"
-g++ -ggdb bininfo.cpp -std=c++23 -Wl,-rpath,'$ORIGIN' -L. -lbininfo -o bininfo
+g++ -g -O0 bininfo.cpp -std=c++23 -Wl,-rpath,'$ORIGIN' -L. -lbininfo -o bininfo
 if [[ $? -eq 0 ]]
 then
     echo "> bininfo build ok <"
