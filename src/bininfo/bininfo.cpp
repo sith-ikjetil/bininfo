@@ -14,6 +14,7 @@
 #include <print>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <unistd.h>
 #include "../include/bininfo.h"
 
 //
@@ -34,21 +35,31 @@ namespace fs = std::filesystem;
 //
 // namespace BinInfo
 //
-namespace BinInfo {
+namespace BinInfo {    
     //
     // Function prototypes.
     //
     void PrintUsageScreen();
     bool IsArgSet(string token, int argc, char** argv);
     string GetArgFilename(int argc, char** argv);
-    void print_as_text(const char* result);
+    void print_as_text(const char* result, bool useColor, bool neverColor);
+
+    //
+    // constexpr 
+    //
+    constexpr auto CLR_GREEN = "\033[32m";
+    constexpr auto CLR_WHITE = "\033[37;1m";
+    constexpr auto CLR_RESET = "\033[0m";
+    constexpr auto CLR_RED = "\033[31;1m";
 
     //
     // Function: BinInfo::main
     //
     // (i): Main entry point.
     //
-    int main(int argc, char** argv) {
+    int main(int argc, char** argv) 
+    {        
+        bool useColor = isatty(STDOUT_FILENO);
         string filename = GetArgFilename(argc, argv);
 
         if (filename.empty()) {
@@ -67,7 +78,7 @@ namespace BinInfo {
             println("{}", result);
         }
         else {
-            print_as_text(result);
+            print_as_text(result, useColor, IsArgSet("--color=never",argc, argv));
         }
 
         bininfo_free(reinterpret_cast<void*>(const_cast<char*>(result)));
@@ -83,7 +94,7 @@ namespace BinInfo {
     void PrintUsageScreen() {
         println("Usage: bininfo [options] <filename>");
         println("Version: 1.3");
-        println("Outputs information from binary ELF64 files as JSON to stdout");
+        println("Outputs information from binary ELF64 files as JSON to stdout.");
         println();
         println("Options:");
         println("  --include-exports     Include exports in output.");
@@ -91,13 +102,15 @@ namespace BinInfo {
         println("  --include-sections    Include sections in output.");
         println("  --format=text         Display a concise text summary (default).");
         println("  --format=json         Display a complete analysis as JSON.");
+        println("  --color=auto          Color when stdout is a terminal.");
+        println("  --color=always        Always emit ANSI colors.");
+        println("  --color=never         Never emit ANSI colors.");
         println();
         println("Examples:");
         println("  bininfo /usr/bin/ls                       Outputs default info.");        
         println("  bininfo /usr/bin/ls --include-exports     Outputs info including exports.");
         println("  bininfo /usr/bin/ls --include-imports     Outputs info including imports.");
-        println("  bininfo /usr/bin/ls --include-sections    Outputs info including sections.");
-        println("  bininfo /usr/bin/ls | ccat --syntax=json  Outputs info and colorize output.");
+        println("  bininfo /usr/bin/ls --include-sections    Outputs info including sections.");        
         println();
         println("Created by Kjetil Kristoffer Solberg <post@ikjetil.no>.");
         println("Written in C++.");
@@ -137,8 +150,12 @@ namespace BinInfo {
     //
     // (i): Prints default output as text output.
     //
-    void print_as_text(const char* result)
-    {
+    void print_as_text(const char* result, bool useColor, bool neverColor)
+    {    
+        if (neverColor) {
+            useColor = false;
+        }
+
         try
         {
             json j = json::parse(result);
@@ -154,7 +171,13 @@ namespace BinInfo {
             {
                 const auto& file = j["file"];
 
-                std::println("File");
+                if (useColor) {
+                    std::println("{}{}File{}", CLR_RESET, CLR_GREEN, CLR_RESET);
+                }
+                else {
+                    std::println("File");
+                }
+
                 std::println("  Path:              {}",
                             file.value("path", "unknown"));
 
@@ -169,7 +192,13 @@ namespace BinInfo {
             {
                 const auto& binary = j["binary"];
 
-                std::println("Binary");
+                if (useColor) {
+                    std::println("{}{}Binary{}", CLR_RESET, CLR_GREEN, CLR_RESET);
+                }
+                else {
+                    std::println("Binary");
+                }
+
                 std::println("  Format:            {}",
                             binary.value("format", "unknown"));
 
@@ -195,8 +224,12 @@ namespace BinInfo {
             if (j.contains("dependencies") &&
                 j["dependencies"].is_array())
             {
-                std::println("Dependencies ({})",
-                            j["dependencies"].size());
+                if (useColor) {
+                    std::println("{}{}Dependencies ({}){}", CLR_RESET, CLR_GREEN, j["dependencies"].size(), CLR_RESET);
+                }
+                else {
+                    std::println("Dependencies ({})", j["dependencies"].size());
+                }
 
                 for (const auto& dependency : j["dependencies"])
                 {
@@ -212,7 +245,13 @@ namespace BinInfo {
             {
                 const auto& elf = j["elf"];
 
-                std::println("ELF");
+                if (useColor) {
+                    std::println("{}{}ELF{}", CLR_RESET, CLR_GREEN, CLR_RESET);
+                }
+                else {
+                    std::println("ELF");
+                }
+
                 std::println("  Version:           {}",
                             elf.value("version", 0));
 
