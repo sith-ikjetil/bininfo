@@ -1,36 +1,41 @@
-% bininfo(1) bininfo 1.2
+% bininfo(1) bininfo 1.3
 % Written by Kjetil Kristoffer Solberg
-% August 2026
+% September 2026
 
 # NAME
-bininfo - outputs information from binary ELF64 files as JSON
+bininfo - outputs information from binary ELF64 files as JSON.
 
 # SYNOPSIS
 **bininfo** [*OPTIONS*] [*FILE*]  
 
 # DESCRIPTION
-Outputs information from binary ELF64 files to stdout as JSON
+Outputs information from binary ELF64 files to stdout as JSON.
 
 # OPTIONS
-**-\-include-exports**     include exports in output  
-**-\-include-imports**     include imports in output  
-**-\-include-sections**    include sections in output  
+**-\-include-exports**     Include exports in output.  
+**-\-include-imports**     Include imports in output.  
+**-\-include-sections**    Include sections in output.  
+**-\-format=text**         Display a concise text summary (default).  
+**-\-format=json**         Display a complete analysis as JSON.  
+**-\-color=auto**          Color when stdout is a terminal.  
+**-\-color=always**        Always emit ANSI colors.  
+**-\-color=never**         Never emit ANSI colors.  
 
 # EXAMPLES
 **bininfo** /usr/bin/ls  
-Outputs default info  
+Outputs default info.  
 
 **bininfo** -\-include-exports /usr/bin/ls  
-Outputs info including exports  
+Outputs info including exports.  
 
 **bininfo** -\-include-imports /usr/bin/ls  
-Outputs info including imports  
+Outputs info including imports.  
 
 **bininfo** -\-include-sections /usr/bin/ls  
-Outputs info including sections  
+Outputs info including sections.  
 
 **bininfo** /usr/bin/ls | ccat -\-syntax=json  
-Outputs info and colorize output  
+Outputs info and colorize output.  
 
 # BUGS
 All software have bugs :)
