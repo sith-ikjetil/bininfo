@@ -1,0 +1,9 @@
+Package: bininfo
+Version: 1.4.0
+Section: tools
+Priority: optional
+Architecture: amd64
+Maintainer: Kjetil Kristoffer Solberg <post@ikjetil.no>
+Depends: libc6, libstdc++6, libqt5pas1, libx11-6
+Description: Outputs information from binary ELF64 files as JSON
+
