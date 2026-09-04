@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=BinInfoUI
+Comment=Binary file information and analysis
+Exec=bininfoui
+Icon=/usr/share/icons/hicolor/apps/bininfo.png
+Type=Application
+Terminal=false
